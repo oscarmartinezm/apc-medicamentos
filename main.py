@@ -4,6 +4,7 @@ import json
 import configparser
 import time
 import os
+import sys
 
 # File names
 INPUT_CSV = 'medicamentos.csv'
@@ -43,52 +44,47 @@ def save_cache(file, data):
   with open(file, 'w', encoding='utf-8') as json_file:
     json.dump(data, json_file, indent=2, ensure_ascii=False)
 
-# Function to get the active principle of a medication
-def get_active_principle(medication):
-  global MEDICAMIENTOS_DICT, client
-  # Check if medication is already cached
-  if medication in MEDICAMIENTOS_DICT:
-    return MEDICAMIENTOS_DICT[medication]
-  prompt = f'For the pharmaceutical medication {medication}, provide its active principle, providing only the name, with no any other text.'
+def execute_prompt(prompt):
+  global client
   try:
     response = client.chat.completions.create(
-      model='gpt-3.5-turbo-1106',
+      model='gpt-4o',
       messages=[{'role': 'user', 'content': prompt}],
       temperature=0.7
     )
-    active_principle = response.choices[0].message.content.strip()
-    # Save to JSON cache for future use
-    MEDICAMIENTOS_DICT[medication] = active_principle
-    save_cache(CACHE, MEDICAMIENTOS_DICT)
-    return active_principle
+    return response.choices[0].message.content.strip()
   except Exception as e:
-    print(f'Error with {medication}: {e}')
-    MEDICAMIENTOS_DICT[medication] = 'Error'
-    save_cache(CACHE, MEDICAMIENTOS_DICT)
+    print(f'Error with {prompt}: {e}')
     return 'Error'
 
+# Function to get the active principle of a medication
+def get_active_principle(medication):
+  medication = 'Xirmen 8mg'
+  global MEDICAMIENTOS_DICT
+  # Check if medication is already cached
+  #if medication in MEDICAMIENTOS_DICT:
+  #  return MEDICAMIENTOS_DICT[medication]
+  prompt = f'Para el medicamento farmaceútico {medication}, dame su principio activo, proveyendo solo el nombre, sin ningún otro texto.'
+  prompt = '¿Cuál es el nombre base del medicamento ALERXY SPRAY NASAL 140DOSIS?'
+  result = execute_prompt(prompt)
+  # Save the result in the cache
+  MEDICAMIENTOS_DICT[medication] = result
+  print(prompt)
+  print(result)
+  save_cache(CACHE, MEDICAMIENTOS_DICT)
+  return result
+
 def get_atc_code(active_principle):
-  global MEDICAMIENTOS_ATC_DICT, client
+  global MEDICAMIENTOS_ATC_DICT
   # Check if medication is already cached
   if active_principle in MEDICAMIENTOS_ATC_DICT:
     return MEDICAMIENTOS_ATC_DICT[active_principle]
-  prompt = f'For the active principle {active_principle}, provide its ATC code and its description in spanish, providing only the values with no any other text, following this format "atc | description".'
-  try:
-    response = client.chat.completions.create(
-      model='gpt-3.5-turbo-1106',
-      messages=[{'role': 'user', 'content': prompt}],
-      temperature=0.7
-    )
-    atc_code = response.choices[0].message.content.strip()
-    # Save to JSON cache for future use
-    MEDICAMIENTOS_ATC_DICT[active_principle] = atc_code
-    save_cache(CACHE_ATC, MEDICAMIENTOS_ATC_DICT)
-    return atc_code
-  except Exception as e:
-    print(f'Error with {active_principle}: {e}')
-    MEDICAMIENTOS_ATC_DICT[active_principle] = 'Error'
-    save_cache(CACHE_ATC, MEDICAMIENTOS_ATC_DICT)
-    return 'Error'
+  prompt = f'Para el principio activo {active_principle}, proporciona su código ATC y su descripción, brindando solo los valores sin ningún otro texto, siguiendo este formato: "atc | descripción".'
+  result = execute_prompt(prompt)
+  # Save the result in the cache
+  MEDICAMIENTOS_ATC_DICT[active_principle] = result
+  save_cache(CACHE_ATC, MEDICAMIENTOS_ATC_DICT)
+  return result
 
 def save_csv():
   global RESULTS
@@ -115,15 +111,22 @@ def main():
       print(f'Processing #{count}: {medication_name}')
       # Get the active principle (from API or JSON cache)
       active_principle = get_active_principle(medication_name)
+      sys.exit()
       # Get the ATC code (from API or JSON cache)
-      atc_code = get_atc_code(active_principle)
+      atc_code_info = get_atc_code(active_principle)
+      if ('Error' not in atc_code_info):
+        atc_code = atc_code_info.split('|')[0].strip()[:3] if '|' in atc_code else ''
+        atc_description = atc_code_info.split('|')[1].strip() if '|' in atc_code else ''
+      else:
+        atc_code = ''
+        atc_description = 'Error'
       # Add to RESULTS list
       RESULTS.append({
         'Articulo_Id': medication_id,
         'Articulo_Nombre': medication_name,
         'Principio_Activo': active_principle,
-        'ATC': atc_code.split('|')[0].strip() if '|' in atc_code else '',
-        'ATC_Descripcion': atc_code.split('|')[1].strip() if '|' in atc_code else ''
+        'ATC': atc_code,
+        'ATC_Descripcion': atc_description
       })
       # Small delay to avoid API rate limits
       time.sleep(1)
