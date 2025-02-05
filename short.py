@@ -52,18 +52,21 @@ def get_atc_code(active_principle):
     print(f'Error: No valid response from API for {active_principle}')
     return 'ERROR'
 
-# Read input file and get ATC codes
+# Read input file and get ATC codes, preserving duplicates
+results = []
 with open(TEXT_FILE, 'r', encoding='utf-8') as file:
-  active_principles = [line.strip() for line in file.readlines()]
-
-# Generate results
-results = {principle: get_atc_code(principle) for principle in active_principles}
+  for line in file:
+    principle = line.strip()
+    if principle:
+      atc_code = get_atc_code(principle)
+      results.append([principle, atc_code])
 
 # Save results to CSV
 with open(CSV_FILE, 'w', newline='', encoding='utf-8') as file:
-  writer = csv.writer(file, delimiter=';')
+  writer = csv.writer(file)
   writer.writerow(['Active Principle', 'ATC Code'])
-  for principle, atc in results.items():
-    writer.writerow([principle, atc])
+  writer.writerows(results)
+
+print(f'Process completed. Results saved in {CSV_FILE}.')
 
 print(f'Process completed. Results saved in {CSV_FILE}.')
