@@ -4,6 +4,7 @@ import json
 import csv
 import openai
 import sys
+import subprocess
 
 # Configuración
 TEXT_FILE = "assets/principios-activos.txt" # Nombre del archivo de texto de entrada
@@ -30,15 +31,22 @@ def get_atc_code(active_principle):
   '''Gets the ATC code from the CACHE or queries OpenAI API if not found.'''
   global COUNT
   COUNT += 1
-  if active_principle in CACHE:
+  if ('no aplica' in active_principle.lower()):
+    return 'No Aplica'
+  elif active_principle in CACHE:
     print(f'Using CACHE for: {active_principle} (#{COUNT})')
     return CACHE[active_principle].replace("\n", ' // ')
   print(f'Querying API for: {active_principle} (#{COUNT})')
+  prompt = f'''
+    Dame el codigo ATC principal (de 3 caracteres) del principio activo {active_principle}.
+    Si no logras encontrar el codigo ATC, por favor responde brevemente, se directo, no decores la respuesta,
+    no hace falta que respondas "lo siento", o "lo lamento", se breve y directo.'
+  '''.replace('\n', ' ').strip()
   response = openai.chat.completions.create(
     model='gpt-4',
     messages=[
       {'role': 'system', 'content': 'You are a helpful assistant.'},
-      {'role': 'user', 'content': f'Provide the 3 chars ATC code for the active principle {active_principle}, only the code with no more text.'}
+      {'role': 'user', 'content': prompt}
     ]
   )
   if response.choices:
@@ -58,14 +66,24 @@ with open(TEXT_FILE, 'r', encoding='utf-8') as file:
   for line in file:
     principle = line.strip()
     if principle:
+      comments = ''
       atc_code = get_atc_code(principle)
-      results.append([principle, atc_code])
+      if ('No Aplica' in atc_code):
+        comments = principle
+        atc_code = 'N/A'
+      elif (len(atc_code) > 15):
+        comments = atc_code
+        atc_code = 'No ATC'
+      results.append([principle, atc_code, comments])
 
 # Save results to CSV
 with open(CSV_FILE, 'w', newline='', encoding='utf-8') as file:
   writer = csv.writer(file)
-  writer.writerow(['Active Principle', 'ATC Code'])
+  writer.writerow(['Principio Activo', 'ATC', 'Comentarios'])
   writer.writerows(results)
+
+#Execute command to open file
+subprocess.run(['open', CSV_FILE])
 
 print(f'Process completed. Results saved in {CSV_FILE}.')
 
