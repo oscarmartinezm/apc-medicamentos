@@ -31,6 +31,10 @@ def get_atc_code(active_principle):
   '''Gets the ATC code from the CACHE or queries OpenAI API if not found.'''
   global COUNT
   COUNT += 1
+  if ('/' in active_principle):
+    active_principle = active_principle.split('/')[0].strip()
+  elif ('+' in active_principle):
+    active_principle = active_principle.split('+')[0].strip()
   if ('no aplica' in active_principle.lower()):
     return 'No Aplica'
   elif active_principle in CACHE:
@@ -38,9 +42,9 @@ def get_atc_code(active_principle):
     return CACHE[active_principle].replace("\n", ' // ')
   print(f'Querying API for: {active_principle} (#{COUNT})')
   prompt = f'''
-    Dame el codigo ATC principal (de 3 caracteres) del principio activo {active_principle}.
-    Si no logras encontrar el codigo ATC, por favor responde brevemente, se directo, no decores la respuesta,
-    no hace falta que respondas "lo siento", o "lo lamento", se breve y directo.'
+    Dame el codigo ATC principal (de 3 caracteres) del principio activo {active_principle}. Dame solo el código sin ningún otro texto.
+    Si no logras encontrar el codigo ATC, por favor responde "No encontrado porque xxxxxxxx" seguido de una muy breve explicación de por qué no lo encontraste,
+    se conciso con la respuesta no hace falta que respondas "lo siento", o "lo lamento", se breve y directo.'
   '''.replace('\n', ' ').strip()
   response = openai.chat.completions.create(
     model='gpt-4',
